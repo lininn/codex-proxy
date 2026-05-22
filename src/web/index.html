@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>codex-proxy</title>
+    <style>
+      :root { color-scheme: light dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+      body { margin: 0; min-height: 100vh; background: #f4f6fa; color: #172033; }
+      main { width: min(920px, calc(100vw - 32px)); margin: 28px auto; }
+      h1 { margin: 0 0 18px; font-size: 28px; }
+      .layout { display: grid; grid-template-columns: 280px 1fr; gap: 18px; align-items: start; }
+      .panel { background: #fff; border: 1px solid #d8deea; border-radius: 8px; padding: 18px; }
+      .toolbar { display: flex; gap: 8px; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+      #providerList { display: grid; gap: 8px; }
+      .provider { width: 100%; display: grid; gap: 4px; text-align: left; padding: 10px; border: 1px solid #c8d0dd; border-radius: 6px; background: #fff; color: inherit; cursor: pointer; }
+      .provider.selected { border-color: #6f7d93; box-shadow: inset 0 0 0 1px #6f7d93; }
+      .provider.active { border-color: #1769e0; background: #eef5ff; box-shadow: inset 4px 0 0 #1769e0; }
+      .provider.active.selected { box-shadow: inset 4px 0 0 #1769e0, inset 0 0 0 1px #1769e0; }
+      .provider strong { font-size: 14px; }
+      .provider span { font-size: 12px; color: #667188; overflow-wrap: anywhere; }
+      .provider em { width: fit-content; padding: 2px 6px; border-radius: 999px; background: #1769e0; color: #fff; font-size: 11px; font-style: normal; font-weight: 800; }
+      label { display: grid; gap: 6px; margin: 12px 0; font-weight: 650; }
+      input, select { width: 100%; box-sizing: border-box; padding: 10px 11px; border: 1px solid #b9c1d1; border-radius: 6px; font: inherit; }
+      button { padding: 10px 13px; border: 0; border-radius: 6px; background: #1769e0; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+      button.secondary { background: #dfe5ef; color: #172033; }
+      button.danger { background: #c82f3d; }
+      .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+      #status { min-height: 24px; margin-top: 14px; color: #245b31; }
+      @media (max-width: 760px) { .layout { grid-template-columns: 1fr; } }
+      @media (prefers-color-scheme: dark) {
+        body { background: #111722; color: #eef2f8; }
+        .panel, .provider { background: #1a2230; border-color: #35435b; }
+        .provider.selected { border-color: #8da0bd; box-shadow: inset 0 0 0 1px #8da0bd; }
+        .provider.active { background: #162b46; border-color: #5ca0ff; box-shadow: inset 4px 0 0 #5ca0ff; }
+        .provider.active.selected { box-shadow: inset 4px 0 0 #5ca0ff, inset 0 0 0 1px #5ca0ff; }
+        .provider span { color: #a7b2c5; }
+        input, select { background: #111722; color: #eef2f8; border-color: #526078; }
+        button.secondary { background: #344057; color: #eef2f8; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>codex-proxy</h1>
+      <div class="layout">
+        <section class="panel">
+          <div class="toolbar">
+            <strong>Providers</strong>
+            <button id="addProvider" type="button" class="secondary">Add</button>
+          </div>
+          <div id="providerList"></div>
+        </section>
+
+        <section class="panel">
+          <form id="form">
+            <label>Port <input id="port" name="port" type="number" min="1" max="65535"></label>
+            <label>Name <input id="name" name="name" autocomplete="off"></label>
+            <label>Proxy Type
+              <select id="providerType" name="providerType">
+                <option value="chat">Chat Completions</option>
+                <option value="anthropic">Anthropic Messages</option>
+              </select>
+            </label>
+            <label>Base URL <input id="baseUrl" name="baseUrl" placeholder="https://api.example.com/v1"></label>
+            <label>API Key <input id="apiKey" name="apiKey" type="password" autocomplete="off"></label>
+            <label>Default Model <input id="defaultModel" name="defaultModel" autocomplete="off"></label>
+            <div class="actions">
+              <button type="button" id="activateProvider" class="secondary">Use Provider</button>
+              <button type="button" id="deleteProvider" class="danger">Delete</button>
+              <button type="submit">Save</button>
+            </div>
+            <div id="status" role="status"></div>
+          </form>
+        </section>
+      </div>
+    </main>
+    <script>
+      const form = document.querySelector("#form");
+      const providerList = document.querySelector("#providerList");
+      const statusEl = document.querySelector("#status");
+      const addProviderButton = document.querySelector("#addProvider");
+      const activateProviderButton = document.querySelector("#activateProvider");
+      const deleteProviderButton = document.querySelector("#deleteProvider");
+      let current = null;
+      let selectedName = "";
+
+      function selectedProvider() {
+        return current.providers.find((provider) => provider.name === selectedName) || current.providers[0];
+      }
+
+      function collectCurrentProvider() {
+        const provider = selectedProvider();
+        if (!provider) return;
+        const previousName = provider.name;
+        provider.providerType = form.providerType.value === "anthropic" ? "anthropic" : "chat";
+        provider.name = form.name.value.trim();
+        provider.baseUrl = form.baseUrl.value.trim();
+        provider.apiKey = form.apiKey.value || provider.apiKey || "";
+        provider.defaultModel = form.defaultModel.value.trim();
+        if (current.defaultProvider === previousName) current.defaultProvider = provider.name;
+        selectedName = provider.name;
+      }
+
+      function ensureDefaultProvider() {
+        if (!current.providers.some((provider) => provider.name === current.defaultProvider)) {
+          current.defaultProvider = selectedName || current.providers[0].name;
+        }
+      }
+
+      function renderList() {
+        providerList.textContent = "";
+        current.providers.forEach((provider) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = `provider${provider.name === selectedName ? " selected" : ""}${provider.name === current.defaultProvider ? " active" : ""}`;
+          const typeLabel = provider.providerType === "anthropic" ? "Anthropic" : "Chat";
+          button.innerHTML = `<strong>${provider.name}</strong><span>${typeLabel} · ${provider.baseUrl || "No base URL"}</span>${provider.name === current.defaultProvider ? "<em>Active</em>" : ""}`;
+          button.addEventListener("click", () => {
+            collectCurrentProvider();
+            selectedName = provider.name;
+            render();
+          });
+          providerList.append(button);
+        });
+      }
+
+      function renderForm() {
+        const provider = selectedProvider() || { providerType: "chat", name: "default", baseUrl: "", apiKey: "", defaultModel: "" };
+        form.port.value = current.port || 8080;
+        form.providerType.value = provider.providerType === "anthropic" ? "anthropic" : "chat";
+        form.name.value = provider.name || "";
+        form.baseUrl.value = provider.baseUrl || "";
+        form.apiKey.value = "";
+        form.apiKey.placeholder = provider.apiKey || "";
+        form.defaultModel.value = provider.defaultModel || "";
+      }
+
+      function render() {
+        renderList();
+        renderForm();
+      }
+
+      async function load() {
+        current = await fetch("/__codexproxy/config").then((res) => res.json());
+        current.providers = current.providers.length ? current.providers : [{ providerType: "chat", name: "default", baseUrl: "", apiKey: "", defaultModel: "" }];
+        selectedName = current.providers.some((provider) => provider.name === current.defaultProvider) ? current.defaultProvider : current.providers[0].name;
+        ensureDefaultProvider();
+        render();
+      }
+
+      addProviderButton.addEventListener("click", () => {
+        collectCurrentProvider();
+        let index = current.providers.length + 1;
+        let name = `provider-${index}`;
+        while (current.providers.some((provider) => provider.name === name)) {
+          index += 1;
+          name = `provider-${index}`;
+        }
+        current.providers.push({ providerType: "chat", name, baseUrl: "", apiKey: "", defaultModel: "" });
+        selectedName = name;
+        render();
+      });
+
+      activateProviderButton.addEventListener("click", () => {
+        collectCurrentProvider();
+        current.defaultProvider = selectedName;
+        render();
+      });
+
+      deleteProviderButton.addEventListener("click", () => {
+        if (current.providers.length <= 1) {
+          statusEl.textContent = "At least one provider is required";
+          return;
+        }
+        current.providers = current.providers.filter((provider) => provider.name !== selectedName);
+        if (current.defaultProvider === selectedName) current.defaultProvider = current.providers[0].name;
+        selectedName = current.defaultProvider;
+        render();
+      });
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        collectCurrentProvider();
+        ensureDefaultProvider();
+        const next = {
+          port: Number(form.port.value),
+          defaultProvider: current.defaultProvider,
+          providers: current.providers
+        };
+        const response = await fetch("/__codexproxy/config", {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(next)
+        });
+        const body = await response.json().catch(() => ({}));
+        statusEl.textContent = response.ok ? "Saved. Restart codex-proxy to apply." : body.error || "Save failed";
+        if (response.ok) current = body;
+      });
+
+      load().catch((error) => { statusEl.textContent = error.message; });
+    </script>
+  </body>
+</html>
