@@ -10,7 +10,7 @@
     "LICENSE"
   ],
   "bin": {
-    "codex-proxy": "./dist/src/cli.js"
+    "codex-proxy": "dist/src/cli.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
