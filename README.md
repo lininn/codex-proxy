@@ -34,7 +34,7 @@ Codex CLI talks to the OpenAI Responses API. Many model providers expose only on
 From npm after publishing:
 
 ```bash
-npm install -g codex-proxy
+npm install -g @lininn/codex-proxy
 ```
 
 From this repository:

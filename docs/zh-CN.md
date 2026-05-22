@@ -16,7 +16,7 @@ Codex CLI 使用 Responses API，但很多模型服务商只提供 Chat Completi
 发布到 npm 后：
 
 ```bash
-npm install -g codex-proxy
+npm install -g @lininn/codex-proxy
 ```
 
 从源码安装：
