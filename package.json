@@ -3,6 +3,12 @@
   "version": "0.1.0",
   "description": "Local OpenAI Responses API proxy for Chat Completions and Anthropic-compatible providers.",
   "type": "module",
+  "files": [
+    "dist/src",
+    "README.md",
+    "docs/zh-CN.md",
+    "LICENSE"
+  ],
   "bin": {
     "codex-proxy": "./dist/src/cli.js"
   },
@@ -10,6 +16,7 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "tsc -p tsconfig.json && node --test dist/test/*.test.js",
+    "prepack": "npm run build",
     "start": "node dist/src/cli.js start"
   },
   "dependencies": {
