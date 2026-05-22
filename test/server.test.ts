@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
 import { loadConfig, saveConfig } from "../src/config.js";
 import { handleResponses } from "../src/proxy.js";
-import { createApp } from "../src/server.js";
+import { createApp, readWebHtml } from "../src/server.js";
 import type { Config } from "../src/types.js";
 
 async function listen(config: Config): Promise<{ url: string; close: () => Promise<void> }> {
@@ -52,6 +52,16 @@ class JsonResponse {
     return this;
   }
 }
+
+test("packaged web UI asset is available without relying on cwd", async () => {
+  const html = await readWebHtml();
+  const asset = await stat(new URL("../src/web/index.html", import.meta.url));
+
+  assert.equal(asset.isFile(), true);
+  assert.match(html, /id="providerList"/);
+  assert.match(html, /id="providerType"/);
+  assert.match(html, /codex-proxy/);
+});
 
 test("config API preserves multiple provider keys and switches the active provider", async () => {
   const home = await mkdtemp(path.join(tmpdir(), "codexproxy-server-"));

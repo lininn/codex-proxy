@@ -42,15 +42,19 @@ export async function createApp(config?: Config, options: { closeOnConfigSave?: 
     res.redirect("/__codexproxy/web");
   });
   app.get("/__codexproxy/web", async (_req, res) => {
-    const htmlPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "web", "index.html");
-    try {
-      res.type("html").send(await readFile(htmlPath, "utf8"));
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-      res.type("html").send(await readFile(path.resolve("src/web/index.html"), "utf8"));
-    }
+    res.type("html").send(await readWebHtml());
   });
   return app;
+}
+
+export async function readWebHtml(): Promise<string> {
+  const htmlPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "web", "index.html");
+  try {
+    return await readFile(htmlPath, "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    return await readFile(path.resolve("src/web/index.html"), "utf8");
+  }
 }
 
 export async function startServer(options: { port?: number } = {}): Promise<{ port: number; close: () => Promise<void> }> {
