@@ -1,6 +1,6 @@
 # codex-proxy 中文说明
 
-返回英文文档：[README.md](../README.md)
+返回英文文档：[README.md](https://github.com/lininn/codex-proxy/blob/main/README.md)
 
 `codex-proxy` 是一个本地 OpenAI Responses API 代理。它接收 Codex CLI 发出的 `/v1/responses` 请求，并根据你选择的 provider 类型转发到：
 

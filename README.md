@@ -2,7 +2,7 @@
 
 Local OpenAI Responses API proxy for Codex CLI. It accepts `/v1/responses` requests and forwards them to either Chat Completions-compatible providers or Anthropic Messages-compatible providers.
 
-Chinese documentation: [docs/zh-CN.md](docs/zh-CN.md)
+Chinese documentation: [docs/zh-CN.md](https://github.com/lininn/codex-proxy/blob/main/docs/zh-CN.md)
 
 ## Why
 
