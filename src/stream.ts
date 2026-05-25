@@ -14,48 +14,53 @@ export async function forwardStream(
   res: WritableResponse,
   translator: StreamTranslator
 ): Promise<void> {
-  res.setHeader("content-type", "text/event-stream; charset=utf-8");
-  res.setHeader("cache-control", "no-cache");
+  try {
+    res.setHeader("content-type", "text/event-stream; charset=utf-8");
+    res.setHeader("cache-control", "no-cache");
 
-  for (const event of translator.onStart()) {
-    writeEvent(res, event);
-  }
+    for (const event of translator.onStart()) {
+      writeEvent(res, event);
+    }
 
-  const reader = upstream.body?.getReader();
-  if (!reader) {
-    for (const event of translator.onDone()) writeEvent(res, event);
-    res.end();
-    return;
-  }
+    const reader = upstream.body?.getReader();
+    if (!reader) {
+      for (const event of translator.onDone()) writeEvent(res, event);
+      res.end();
+      return;
+    }
 
-  const decoder = new TextDecoder();
-  let buffer = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split(/\r?\n/);
-    buffer = lines.pop() ?? "";
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith(":") || !trimmed.startsWith("data:")) {
-        continue;
-      }
-      const payload = trimmed.slice(5).trim();
-      if (payload === "[DONE]") {
-        for (const event of translator.onDone()) writeEvent(res, event);
-        res.end();
-        return;
-      }
-      const chunk = JSON.parse(payload) as ChatCompletionChunk;
-      for (const event of translator.onDelta(chunk)) {
-        writeEvent(res, event);
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() ?? "";
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith(":") || !trimmed.startsWith("data:")) {
+          continue;
+        }
+        const payload = trimmed.slice(5).trim();
+        if (payload === "[DONE]") {
+          for (const event of translator.onDone()) writeEvent(res, event);
+          res.end();
+          return;
+        }
+        const chunk = JSON.parse(payload) as ChatCompletionChunk;
+        for (const event of translator.onDelta(chunk)) {
+          writeEvent(res, event);
+        }
       }
     }
-  }
 
-  for (const event of translator.onDone()) writeEvent(res, event);
-  res.end();
+    for (const event of translator.onDone()) writeEvent(res, event);
+    res.end();
+  } catch (error) {
+    for (const event of translator.onError((error as Error).message)) writeEvent(res, event);
+    res.end();
+  }
 }
 
 export async function forwardAnthropicStream(
@@ -63,49 +68,54 @@ export async function forwardAnthropicStream(
   res: WritableResponse,
   translator: AnthropicStreamTranslator
 ): Promise<void> {
-  res.setHeader("content-type", "text/event-stream; charset=utf-8");
-  res.setHeader("cache-control", "no-cache");
+  try {
+    res.setHeader("content-type", "text/event-stream; charset=utf-8");
+    res.setHeader("cache-control", "no-cache");
 
-  for (const event of translator.onStart()) {
-    writeEvent(res, event);
-  }
+    for (const event of translator.onStart()) {
+      writeEvent(res, event);
+    }
 
-  const reader = upstream.body?.getReader();
-  if (!reader) {
-    for (const event of translator.onDone()) writeEvent(res, event);
-    res.end();
-    return;
-  }
+    const reader = upstream.body?.getReader();
+    if (!reader) {
+      for (const event of translator.onDone()) writeEvent(res, event);
+      res.end();
+      return;
+    }
 
-  const decoder = new TextDecoder();
-  let buffer = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split(/\r?\n/);
-    buffer = lines.pop() ?? "";
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith(":") || !trimmed.startsWith("event:") || !trimmed.startsWith("data:")) {
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() ?? "";
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith(":") || !trimmed.startsWith("event:") || !trimmed.startsWith("data:")) {
+          if (!trimmed.startsWith("data:")) continue;
+        }
         if (!trimmed.startsWith("data:")) continue;
-      }
-      if (!trimmed.startsWith("data:")) continue;
-      const payload = trimmed.slice(5).trim();
-      const event = JSON.parse(payload) as AnthropicStreamEvent;
-      for (const responseEvent of translator.onDelta(event)) {
-        writeEvent(res, responseEvent);
-      }
-      if (event.type === "message_stop") {
-        for (const responseEvent of translator.onDone()) writeEvent(res, responseEvent);
-        res.end();
-        return;
+        const payload = trimmed.slice(5).trim();
+        const event = JSON.parse(payload) as AnthropicStreamEvent;
+        for (const responseEvent of translator.onDelta(event)) {
+          writeEvent(res, responseEvent);
+        }
+        if (event.type === "message_stop") {
+          for (const responseEvent of translator.onDone()) writeEvent(res, responseEvent);
+          res.end();
+          return;
+        }
       }
     }
-  }
 
-  for (const event of translator.onDone()) writeEvent(res, event);
-  res.end();
+    for (const event of translator.onDone()) writeEvent(res, event);
+    res.end();
+  } catch (error) {
+    for (const event of translator.onError((error as Error).message)) writeEvent(res, event);
+    res.end();
+  }
 }
 
 function writeEvent(res: WritableResponse, event: ResponsesSSEEvent): void {

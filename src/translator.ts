@@ -351,7 +351,17 @@ export class StreamTranslator {
     return events;
   }
 
-  private response(status: "in_progress" | "completed"): Record<string, unknown> {
+  onError(message: string): ResponsesSSEEvent[] {
+    return [{
+      type: "response.failed",
+      response: {
+        ...this.response("failed"),
+        error: { type: "server_error", message: `Upstream stream failed: ${message}` }
+      }
+    }];
+  }
+
+  private response(status: "in_progress" | "completed" | "failed"): Record<string, unknown> {
     return {
       id: this.responseId,
       object: "response",
@@ -478,7 +488,17 @@ export class AnthropicStreamTranslator {
     return events;
   }
 
-  private response(status: "in_progress" | "completed"): Record<string, unknown> {
+  onError(message: string): ResponsesSSEEvent[] {
+    return [{
+      type: "response.failed",
+      response: {
+        ...this.response("failed"),
+        error: { type: "server_error", message: `Upstream stream failed: ${message}` }
+      }
+    }];
+  }
+
+  private response(status: "in_progress" | "completed" | "failed"): Record<string, unknown> {
     return {
       id: this.responseId,
       object: "response",

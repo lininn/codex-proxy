@@ -28,21 +28,21 @@ export async function createApp(config?: Config, options: { closeOnConfigSave?: 
   const app = express();
   app.use(express.json({ limit: "10mb" }));
 
-  app.post("/v1/responses", (req, res) => {
+  app.post("/v1/responses", async (req, res) => {
     log(`REQUEST: ${req.method} ${req.originalUrl} - body: ${JSON.stringify(req.body).slice(0, 200)}`);
-    void handleResponses(req, res, config);
+    await runProxyRoute(req, res, () => handleResponses(req, res, config));
   });
-  app.post("/v1/chat/completions", (req, res) => {
+  app.post("/v1/chat/completions", async (req, res) => {
     log(`REQUEST: ${req.method} ${req.originalUrl}`);
-    void passthrough(req, res, config);
+    await runProxyRoute(req, res, () => passthrough(req, res, config));
   });
-  app.get("/v1/models", (req, res) => {
+  app.get("/v1/models", async (req, res) => {
     log(`REQUEST: ${req.method} ${req.originalUrl}`);
-    void passthrough(req, res, config);
+    await runProxyRoute(req, res, () => passthrough(req, res, config));
   });
-  app.get("/v1/models/:model", (req, res) => {
+  app.get("/v1/models/:model", async (req, res) => {
     log(`REQUEST: ${req.method} ${req.originalUrl}`);
-    void passthrough(req, res, config);
+    await runProxyRoute(req, res, () => passthrough(req, res, config));
   });
   app.get("/__codexproxy/config", (_req, res) => {
     res.json(toPublicConfig(config));
@@ -65,6 +65,23 @@ export async function createApp(config?: Config, options: { closeOnConfigSave?: 
     res.type("html").send(await readWebHtml());
   });
   return app;
+}
+
+async function runProxyRoute(
+  req: express.Request,
+  res: express.Response,
+  action: () => Promise<void>
+): Promise<void> {
+  try {
+    await action();
+  } catch (error) {
+    log(`ERROR: ${req.method} ${req.originalUrl} - ${(error as Error).message}`);
+    if (res.headersSent) {
+      res.end();
+      return;
+    }
+    res.status(500).json({ error: (error as Error).message });
+  }
 }
 
 export async function readWebHtml(): Promise<string> {

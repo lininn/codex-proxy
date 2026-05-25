@@ -39,6 +39,24 @@ test("forwardStream converts Chat Completions SSE to Responses SSE", async () =>
   assert.match(output, /event: response.completed/);
 });
 
+test("forwardStream emits a failed Responses event when upstream SSE is malformed", async () => {
+  const body = [
+    "data: {\"id\":\"c1\",\"model\":\"m\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Hi\"}}]}",
+    "",
+    "data: {not json}",
+    ""
+  ].join("\n");
+  const upstream = new Response(body, { headers: { "content-type": "text/event-stream" } });
+  const res = new MemoryResponse();
+
+  await forwardStream(upstream, res, new StreamTranslator("resp_1", "m"));
+
+  const output = res.chunks.join("");
+  assert.match(output, /event: response.output_text.delta/);
+  assert.match(output, /event: response.failed/);
+  assert.match(output, /Upstream stream failed/);
+});
+
 test("forwardAnthropicStream converts Anthropic SSE to Responses SSE", async () => {
   const body = [
     "event: content_block_delta",

@@ -185,6 +185,29 @@ test("config API rejects a default provider that is not in the provider list", a
   }
 });
 
+test("responses route returns an error instead of leaving handler rejections unhandled", async () => {
+  const config: Config = {
+    port: 8080,
+    defaultProvider: "default",
+    providers: [{ name: "default", baseUrl: "https://upstream.example/v1", apiKey: "key", defaultModel: "model" }]
+  };
+  const server = await listen(config);
+  try {
+    const response = await fetch(`${server.url}/v1/responses`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ model: "model" }),
+      signal: AbortSignal.timeout(1000)
+    });
+    const body = await response.json() as { error: string };
+
+    assert.equal(response.status, 500);
+    assert.match(body.error, /not iterable/);
+  } finally {
+    await server.close();
+  }
+});
+
 test("web UI exposes multiple provider management controls", async () => {
   const config: Config = {
     port: 8080,
