@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 import { getConfigPath, loadConfig } from "./config.js";
 import { createApp, startServer } from "./server.js";
-import { startManagedProxy, stopManagedProxy } from "./service.js";
+import { clearLogs, getLogPath, readLogs, startManagedProxy, stopManagedProxy } from "./service.js";
 
 const program = new Command();
 
@@ -117,6 +117,30 @@ program
   .description("print the configuration file path")
   .action(() => {
     console.log(getConfigPath());
+  });
+
+program
+  .command("logs")
+  .description("show recent log entries")
+  .option("-n, --lines <lines>", "number of lines to show", "100")
+  .action(async (options: { lines?: string }) => {
+    const logs = await readLogs(options.lines ? Number(options.lines) : 100);
+    console.log(logs);
+  });
+
+program
+  .command("clear-logs")
+  .description("clear log files")
+  .action(async () => {
+    await clearLogs();
+    console.log("Logs cleared");
+  });
+
+program
+  .command("log-path")
+  .description("print the log file path")
+  .action(() => {
+    console.log(getLogPath());
   });
 
 if (process.argv.includes("--web") && process.argv.length === 3) {
