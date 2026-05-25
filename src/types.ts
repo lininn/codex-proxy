@@ -35,7 +35,7 @@ export type ResponsesInputItem =
 export interface ResponsesMessageInput {
   type: "message";
   role: "user" | "assistant" | "system" | "developer";
-  content: ResponsesContentPart[];
+  content: ResponsesContentPart[] | null;
 }
 
 export interface ResponsesContentPart {

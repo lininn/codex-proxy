@@ -40,6 +40,22 @@ test("translator converts Responses requests into Chat Completions requests", ()
   assert.equal(translated.tools?.[0]?.function.name, "lookup");
 });
 
+test("translator treats null Responses message content as empty text", () => {
+  const translated = translateRequest({
+    model: "my-model",
+    input: [
+      { type: "message", role: "assistant", content: null },
+      { type: "message", role: "user", content: [{ type: "input_text", text: "Hello" }] }
+    ],
+    stream: true
+  }, "deepseek-chat");
+
+  assert.deepEqual(translated.messages, [
+    { role: "assistant", content: "" },
+    { role: "user", content: "Hello" }
+  ]);
+});
+
 test("translator converts Chat Completions responses into Responses responses", () => {
   const translated = translateResponse({
     id: "chatcmpl_1",

@@ -116,7 +116,8 @@ function toAnthropicMessage(item: ResponsesInputItem): AnthropicMessage {
   };
 }
 
-function convertAnthropicContent(content: Array<{ type: string; text?: string; image_url?: string }>): string | AnthropicContentPart[] {
+function convertAnthropicContent(content: Array<{ type: string; text?: string; image_url?: string }> | null | undefined): string | AnthropicContentPart[] {
+  content ??= [];
   if (content.every((part) => part.type !== "input_image")) {
     return contentToText(content);
   }
@@ -128,11 +129,13 @@ function convertAnthropicContent(content: Array<{ type: string; text?: string; i
   });
 }
 
-function contentToText(content: Array<{ text?: string }>): string {
+function contentToText(content: Array<{ text?: string }> | null | undefined): string {
+  content ??= [];
   return content.map((part) => part.text ?? "").join("");
 }
 
-function convertContent(content: Array<{ type: string; text?: string; image_url?: string }>): string | ChatContentPart[] {
+function convertContent(content: Array<{ type: string; text?: string; image_url?: string }> | null | undefined): string | ChatContentPart[] {
+  content ??= [];
   if (content.every((part) => part.type !== "input_image")) {
     return content.map((part) => part.text ?? "").join("");
   }
