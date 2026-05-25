@@ -24,6 +24,79 @@ Codex CLI talks to the OpenAI Responses API. Many model providers expose only on
 - Background service commands: start, stop, restart.
 - API keys stored locally in `~/.codexproxy/config.json`.
 
+## Architecture
+
+### Request Flow
+
+```
+┌───────────┐  /v1/responses   ┌─────────────┐  /chat/completions  ┌──────────────┐
+│ Codex CLI │ ────────────────▶│ codex-proxy │ ───────────────────▶│  OpenAI /    │
+│           │◀────────────────│  (localhost) │◀───────────────────│  DeepSeek /  │
+└───────────┘  Responses API   └──────┬───────┘  Chat Completions  │  etc.        │
+                                      │                           └──────────────┘
+                                      │ /v1/responses
+                                      │
+                                      ▼
+                               ┌─────────────┐  /messages  ┌──────────────┐
+                               │ codex-proxy │ ───────────▶│  Anthropic   │
+                               │             │◀────────────│  Claude      │
+                               └─────────────┘  Messages   └──────────────┘
+```
+
+### Module Structure
+
+```
+src/
+├── cli.ts          # CLI entry point (commander)
+├── server.ts       # Express server & route registration
+├── proxy.ts        # Request forwarding logic
+├── translator.ts   # Protocol translation (Responses ↔ Chat/Anthropic)
+├── stream.ts       # SSE streaming translation
+├── config.ts       # Config management (~/.codexproxy/config.json)
+├── types.ts        # TypeScript type definitions
+└── service.ts      # Background process management (PID, logs)
+```
+
+### Translation Pipeline
+
+```
+Codex CLI request (Responses API)
+        │
+        ▼
+   ┌─────────┐
+   │ proxy.ts│ ── reads config to determine provider type
+   └────┬────┘
+        │
+        ├──── providerType === "chat" ──────────────────────┐
+        │                                                    ▼
+        │                                          ┌──────────────┐
+        │                                          │ translator.ts│
+        │                                          │ translateRequest()
+        │                                          └──────┬───────┘
+        │                                                  ▼
+        │                                         upstream /chat/completions
+        │                                                  │
+        │                                          ┌───────┴──────┐
+        │                                          │ translateResponse()
+        │                                          │ or StreamTranslator
+        │                                          └──────────────┘
+        │
+        └──── providerType === "anthropic" ─────────────────┐
+                                                             ▼
+                                                   ┌──────────────┐
+                                                   │ translator.ts│
+                                                   │ translateAnthropicRequest()
+                                                   └──────┬───────┘
+                                                           ▼
+                                                  upstream /messages
+                                                           │
+                                                   ┌───────┴──────────────┐
+                                                   │ translateAnthropicResponse()
+                                                   │ or AnthropicStreamTranslator
+                                                   └──────────────────────┘
+```
+
+
 ## Requirements
 
 - Node.js 20 or newer

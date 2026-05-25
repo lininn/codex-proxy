@@ -134,3 +134,76 @@ node dist/src/cli.js start
 - 保存配置不会热更新正在运行的代理，需要执行 `codex-proxy restart`。
 - 内部配置接口仍保留 `/__codexproxy/*`，用于兼容已有实现。
 - 默认配置目录仍是 `~/.codexproxy`。
+
+## 架构
+
+### 请求流程
+
+```
+┌───────────┐  /v1/responses   ┌─────────────┐  /chat/completions  ┌──────────────┐
+│ Codex CLI │ ────────────────▶│ codex-proxy │ ───────────────────▶│  OpenAI /    │
+│           │◀────────────────│  (本机运行)  │◀───────────────────│  DeepSeek /  │
+└───────────┘  Responses API   └──────┬───────┘  Chat Completions  │  其他服务    │
+                                      │                           └──────────────┘
+                                      │ /v1/responses
+                                      │
+                                      ▼
+                               ┌─────────────┐  /messages  ┌──────────────┐
+                               │ codex-proxy │ ───────────▶│  Anthropic   │
+                               │             │◀────────────│  Claude      │
+                               └─────────────┘  Messages   └──────────────┘
+```
+
+### 模块结构
+
+```
+src/
+├── cli.ts          # CLI 入口 (commander)
+├── server.ts       # Express 服务器 & 路由注册
+├── proxy.ts        # 请求转发逻辑
+├── translator.ts   # 协议翻译 (Responses ↔ Chat/Anthropic)
+├── stream.ts       # SSE 流式翻译
+├── config.ts       # 配置管理 (~/.codexproxy/config.json)
+├── types.ts        # TypeScript 类型定义
+└── service.ts      # 后台进程管理 (PID, 日志)
+```
+
+### 翻译流水线
+
+```
+Codex CLI 请求 (Responses API)
+        │
+        ▼
+   ┌─────────┐
+   │ proxy.ts│ ── 读取配置，判断 provider 类型
+   └────┬────┘
+        │
+        ├──── providerType === "chat" ──────────────────────┐
+        │                                                    ▼
+        │                                          ┌──────────────┐
+        │                                          │ translator.ts│
+        │                                          │ translateRequest()
+        │                                          └──────┬───────┘
+        │                                                  ▼
+        │                                        upstream /chat/completions
+        │                                                  │
+        │                                          ┌───────┴──────┐
+        │                                          │ translateResponse()
+        │                                          │ 或 StreamTranslator
+        │                                          └──────────────┘
+        │
+        └──── providerType === "anthropic" ─────────────────┐
+                                                             ▼
+                                                   ┌──────────────┐
+                                                   │ translator.ts│
+                                                   │ translateAnthropicRequest()
+                                                   └──────┬───────┘
+                                                           ▼
+                                                  upstream /messages
+                                                           │
+                                                   ┌───────┴──────────────┐
+                                                   │ translateAnthropicResponse()
+                                                   │ 或 AnthropicStreamTranslator
+                                                   └──────────────────────┘
+```
+
