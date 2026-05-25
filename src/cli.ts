@@ -1,7 +1,12 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import open from "open";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const packageJson = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf-8"));
 
 import { getConfigPath, loadConfig } from "./config.js";
 import { createApp, startServer } from "./server.js";
@@ -12,7 +17,7 @@ const program = new Command();
 program
   .name("codex-proxy")
   .description("Local Responses API proxy for Chat Completions and Anthropic-compatible providers.")
-  .version("0.1.0")
+  .version(packageJson.version)
   .option("--web", "open the configuration page");
 
 program
