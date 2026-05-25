@@ -1,6 +1,6 @@
 {
   "name": "@lininn/codex-proxy",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Local OpenAI Responses API proxy for Chat Completions and Anthropic-compatible providers.",
   "type": "module",
   "files": [

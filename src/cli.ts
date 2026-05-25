@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const packageJson = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf-8"));
+const packageJson = JSON.parse(readFileSync(join(__dirname, "..", "..", "package.json"), "utf-8"));
 
 import { getConfigPath, loadConfig } from "./config.js";
 import { createApp, startServer } from "./server.js";
