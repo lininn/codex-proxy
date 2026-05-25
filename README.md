@@ -77,7 +77,7 @@ Each provider has:
 - Proxy Type: `Chat Completions` or `Anthropic Messages`.
 - Base URL: provider API base URL.
 - API Key: stored locally and masked in the UI.
-- Default Model: optional model override.
+- Default Model: optional model override. If set, this model is used; otherwise the model from the request is used.
 
 Only one provider is active at a time. Use the web page to select the active provider, then restart the proxy.
 

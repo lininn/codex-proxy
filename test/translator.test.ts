@@ -12,7 +12,7 @@ import {
 
 test("translator converts Responses requests into Chat Completions requests", () => {
   const translated = translateRequest({
-    model: "ignored",
+    model: "my-model",
     instructions: "Be concise.",
     input: [
       { type: "message", role: "user", content: [{ type: "input_text", text: "Hello" }] },
@@ -67,7 +67,7 @@ test("translator converts Chat Completions responses into Responses responses", 
 
 test("translator converts Responses requests into Anthropic Messages requests", () => {
   const translated = translateAnthropicRequest({
-    model: "ignored",
+    model: "my-model",
     instructions: "Be concise.",
     input: [
       { type: "message", role: "user", content: [{ type: "input_text", text: "Hello" }] },

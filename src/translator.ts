@@ -32,7 +32,7 @@ export function translateRequest(responsesReq: ResponsesRequest, defaultModel?: 
   }
 
   const request: ChatCompletionsRequest = {
-    model: defaultModel || responsesReq.model,
+    model: defaultModel || responsesReq.model || "",
     messages
   };
   if (responsesReq.stream !== undefined) request.stream = responsesReq.stream;
@@ -67,7 +67,7 @@ export function translateAnthropicRequest(responsesReq: ResponsesRequest, defaul
   }
 
   const request: AnthropicMessagesRequest = {
-    model: defaultModel || responsesReq.model,
+    model: defaultModel || responsesReq.model || "",
     messages,
     max_tokens: responsesReq.max_output_tokens ?? 1024
   };

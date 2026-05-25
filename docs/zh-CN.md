@@ -59,7 +59,7 @@ codex-proxy --web
 - Proxy Type：选择 `Chat Completions` 或 `Anthropic Messages`。
 - Base URL：上游 API 的 base URL。
 - API Key：本地保存，Web 页面会脱敏显示。
-- Default Model：可选，填写后会覆盖 Codex CLI 请求中的模型名。
+- Default Model：可选，优先使用该模型；未填写则使用请求中的模型。
 
 同一时间只有一个 provider 生效。保存并切换默认 provider 后，请重启代理。
 
