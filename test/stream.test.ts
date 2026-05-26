@@ -30,13 +30,14 @@ test("forwardStream converts Chat Completions SSE to Responses SSE", async () =>
   const upstream = new Response(body, { headers: { "content-type": "text/event-stream" } });
   const res = new MemoryResponse();
 
-  await forwardStream(upstream, res, new StreamTranslator("resp_1", "m"));
+  const result = await forwardStream(upstream, res, new StreamTranslator("resp_1", "m"));
 
   const output = res.chunks.join("");
   assert.match(output, /event: response.created/);
   assert.match(output, /event: response.output_text.delta/);
   assert.match(output, /"delta":"Hi"/);
   assert.match(output, /event: response.completed/);
+  assert.equal(result.ok, true);
 });
 
 test("forwardStream emits a failed Responses event when upstream SSE is malformed", async () => {
@@ -49,12 +50,13 @@ test("forwardStream emits a failed Responses event when upstream SSE is malforme
   const upstream = new Response(body, { headers: { "content-type": "text/event-stream" } });
   const res = new MemoryResponse();
 
-  await forwardStream(upstream, res, new StreamTranslator("resp_1", "m"));
+  const result = await forwardStream(upstream, res, new StreamTranslator("resp_1", "m"));
 
   const output = res.chunks.join("");
   assert.match(output, /event: response.output_text.delta/);
   assert.match(output, /event: response.failed/);
   assert.match(output, /Upstream stream failed/);
+  assert.equal(result.ok, false);
 });
 
 test("forwardAnthropicStream converts Anthropic SSE to Responses SSE", async () => {
@@ -69,11 +71,12 @@ test("forwardAnthropicStream converts Anthropic SSE to Responses SSE", async () 
   const upstream = new Response(body, { headers: { "content-type": "text/event-stream" } });
   const res = new MemoryResponse();
 
-  await forwardAnthropicStream(upstream, res, new AnthropicStreamTranslator("resp_1", "claude-sonnet-4"));
+  const result = await forwardAnthropicStream(upstream, res, new AnthropicStreamTranslator("resp_1", "claude-sonnet-4"));
 
   const output = res.chunks.join("");
   assert.match(output, /event: response.created/);
   assert.match(output, /event: response.output_text.delta/);
   assert.match(output, /"delta":"Hi"/);
   assert.match(output, /event: response.completed/);
+  assert.equal(result.ok, true);
 });

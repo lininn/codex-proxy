@@ -25,7 +25,7 @@ export function translateRequest(responsesReq: ResponsesRequest, defaultModel?: 
 
   if (typeof responsesReq.input === "string") {
     messages.push({ role: "user", content: responsesReq.input });
-  } else {
+  } else if (Array.isArray(responsesReq.input)) {
     for (const item of responsesReq.input) {
       messages.push(toChatMessage(item));
     }
@@ -56,7 +56,7 @@ export function translateAnthropicRequest(responsesReq: ResponsesRequest, defaul
 
   if (typeof responsesReq.input === "string") {
     messages.push({ role: "user", content: responsesReq.input });
-  } else {
+  } else if (Array.isArray(responsesReq.input)) {
     for (const item of responsesReq.input) {
       if (item.type === "message" && (item.role === "system" || item.role === "developer")) {
         systemParts.push(contentToText(item.content));

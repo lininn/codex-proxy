@@ -185,7 +185,7 @@ test("config API rejects a default provider that is not in the provider list", a
   }
 });
 
-test("responses route returns an error instead of leaving handler rejections unhandled", async () => {
+test("responses route rejects missing input without contacting upstream", async () => {
   const config: Config = {
     port: 8080,
     defaultProvider: "default",
@@ -201,8 +201,8 @@ test("responses route returns an error instead of leaving handler rejections unh
     });
     const body = await response.json() as { error: string };
 
-    assert.equal(response.status, 500);
-    assert.match(body.error, /not iterable/);
+    assert.equal(response.status, 400);
+    assert.match(body.error, /input/);
   } finally {
     await server.close();
   }

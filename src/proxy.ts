@@ -21,25 +21,42 @@ interface MinimalResponse {
   setHeader(name: string, value: string): MinimalResponse;
 }
 
+let _logFn: ((message: string) => void) | undefined;
+export function setLogFn(fn: (message: string) => void): void {
+  _logFn = fn;
+}
+function log(message: string): void {
+  _logFn?.(message);
+}
+
 export async function handleResponses(
   req: Pick<Request, "body">,
   res: MinimalResponse,
   config: Config,
   fetchImpl: FetchImpl = fetch
 ): Promise<void> {
+  const startTime = Date.now();
   let provider;
   try {
     provider = await getProvider(undefined, config);
   } catch (error) {
+    log(`AUTH_ERROR: ${(error as Error).message}`);
     res.status(401).json({ error: String((error as Error).message) });
     return;
   }
   if (!provider.apiKey) {
+    log("AUTH_ERROR: Provider API key is not configured.");
     res.status(401).json({ error: "Provider API key is not configured." });
     return;
   }
 
   const body = req.body as ResponsesRequest;
+  const validationError = validateResponsesRequest(body);
+  if (validationError) {
+    log(`BAD_REQUEST: ${validationError}`);
+    res.status(400).json({ error: validationError });
+    return;
+  }
   const providerType = provider.providerType ?? "chat";
   const upstreamBody = providerType === "anthropic"
     ? translateAnthropicRequest(body, provider.defaultModel)
@@ -63,28 +80,46 @@ export async function handleResponses(
       body: JSON.stringify(upstreamBody)
     });
   } catch (error) {
+    log(`UPSTREAM_FETCH_ERROR: ${(error as Error).message} - ${Date.now() - startTime}ms`);
     res.status(502).json({ error: `Upstream request failed: ${(error as Error).message}` });
     return;
   }
 
   if (!upstream.ok) {
-    res.status(upstream.status).send(await upstream.text());
+    const errorBody = await upstream.text();
+    log(`UPSTREAM_ERROR: status=${upstream.status} body=${errorBody.slice(0, 500)} - ${Date.now() - startTime}ms`);
+    res.status(upstream.status).send(errorBody);
     return;
   }
 
   if (body.stream) {
-    if (providerType === "anthropic") {
-      await forwardAnthropicStream(upstream, res as ExpressResponse, new AnthropicStreamTranslator(undefined, upstreamBody.model));
-      return;
+    const streamResult = providerType === "anthropic"
+      ? await forwardAnthropicStream(upstream, res as ExpressResponse, new AnthropicStreamTranslator(undefined, upstreamBody.model))
+      : await forwardStream(upstream, res as ExpressResponse, new StreamTranslator(undefined, upstreamBody.model));
+    if (streamResult.ok) {
+      log(`STREAM_DONE: ${Date.now() - startTime}ms`);
+    } else {
+      log(`STREAM_FAILED: ${streamResult.error ?? "unknown error"} - ${Date.now() - startTime}ms`);
     }
-    await forwardStream(upstream, res as ExpressResponse, new StreamTranslator(undefined, upstreamBody.model));
     return;
   }
 
   const translated = providerType === "anthropic"
     ? translateAnthropicResponse(await upstream.json() as AnthropicMessagesResponse)
     : translateResponse(await upstream.json() as ChatCompletionsResponse);
+  log(`RESPONSE: ${Date.now() - startTime}ms`);
   res.status(200).json(translated);
+}
+
+function validateResponsesRequest(body: unknown): string | undefined {
+  if (!body || typeof body !== "object") {
+    return "Responses request body must be an object.";
+  }
+  const input = (body as Partial<ResponsesRequest>).input;
+  if (typeof input !== "string" && !Array.isArray(input)) {
+    return "Responses request input must be a string or an array.";
+  }
+  return undefined;
 }
 
 export async function passthrough(

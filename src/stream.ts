@@ -1,5 +1,3 @@
-import type { ServerResponse } from "node:http";
-
 import { AnthropicStreamTranslator, StreamTranslator } from "./translator.js";
 import type { AnthropicStreamEvent, ChatCompletionChunk, ResponsesSSEEvent } from "./types.js";
 
@@ -9,11 +7,17 @@ interface WritableResponse {
   setHeader(name: string, value: string): unknown;
 }
 
+export interface StreamForwardResult {
+  ok: boolean;
+  error?: string;
+}
+
 export async function forwardStream(
   upstream: Response,
   res: WritableResponse,
   translator: StreamTranslator
-): Promise<void> {
+): Promise<StreamForwardResult> {
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
   try {
     res.setHeader("content-type", "text/event-stream; charset=utf-8");
     res.setHeader("cache-control", "no-cache");
@@ -22,11 +26,11 @@ export async function forwardStream(
       writeEvent(res, event);
     }
 
-    const reader = upstream.body?.getReader();
+    reader = upstream.body?.getReader();
     if (!reader) {
       for (const event of translator.onDone()) writeEvent(res, event);
       res.end();
-      return;
+      return { ok: true };
     }
 
     const decoder = new TextDecoder();
@@ -46,7 +50,8 @@ export async function forwardStream(
         if (payload === "[DONE]") {
           for (const event of translator.onDone()) writeEvent(res, event);
           res.end();
-          return;
+          await cancelReader(reader);
+          return { ok: true };
         }
         const chunk = JSON.parse(payload) as ChatCompletionChunk;
         for (const event of translator.onDelta(chunk)) {
@@ -57,9 +62,15 @@ export async function forwardStream(
 
     for (const event of translator.onDone()) writeEvent(res, event);
     res.end();
+    return { ok: true };
   } catch (error) {
-    for (const event of translator.onError((error as Error).message)) writeEvent(res, event);
+    const message = (error as Error).message;
+    for (const event of translator.onError(message)) writeEvent(res, event);
     res.end();
+    await cancelReader(reader);
+    return { ok: false, error: message };
+  } finally {
+    releaseReader(reader);
   }
 }
 
@@ -67,7 +78,8 @@ export async function forwardAnthropicStream(
   upstream: Response,
   res: WritableResponse,
   translator: AnthropicStreamTranslator
-): Promise<void> {
+): Promise<StreamForwardResult> {
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
   try {
     res.setHeader("content-type", "text/event-stream; charset=utf-8");
     res.setHeader("cache-control", "no-cache");
@@ -76,11 +88,11 @@ export async function forwardAnthropicStream(
       writeEvent(res, event);
     }
 
-    const reader = upstream.body?.getReader();
+    reader = upstream.body?.getReader();
     if (!reader) {
       for (const event of translator.onDone()) writeEvent(res, event);
       res.end();
-      return;
+      return { ok: true };
     }
 
     const decoder = new TextDecoder();
@@ -105,20 +117,43 @@ export async function forwardAnthropicStream(
         if (event.type === "message_stop") {
           for (const responseEvent of translator.onDone()) writeEvent(res, responseEvent);
           res.end();
-          return;
+          await cancelReader(reader);
+          return { ok: true };
         }
       }
     }
 
     for (const event of translator.onDone()) writeEvent(res, event);
     res.end();
+    return { ok: true };
   } catch (error) {
-    for (const event of translator.onError((error as Error).message)) writeEvent(res, event);
+    const message = (error as Error).message;
+    for (const event of translator.onError(message)) writeEvent(res, event);
     res.end();
+    await cancelReader(reader);
+    return { ok: false, error: message };
+  } finally {
+    releaseReader(reader);
   }
 }
 
 function writeEvent(res: WritableResponse, event: ResponsesSSEEvent): void {
   res.write(`event: ${event.type}\n`);
   res.write(`data: ${JSON.stringify(event)}\n\n`);
+}
+
+async function cancelReader(reader: ReadableStreamDefaultReader<Uint8Array> | undefined): Promise<void> {
+  try {
+    await reader?.cancel();
+  } catch {
+    // The response is already ending; cleanup failures should not mask the stream result.
+  }
+}
+
+function releaseReader(reader: ReadableStreamDefaultReader<Uint8Array> | undefined): void {
+  try {
+    reader?.releaseLock();
+  } catch {
+    // Some implementations throw if the reader is already released.
+  }
 }

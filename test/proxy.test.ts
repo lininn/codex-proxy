@@ -93,3 +93,27 @@ test("handleResponses routes anthropic providers to Messages API", async () => {
   assert.equal(res.statusCode, 200);
   assert.equal((res.body as { output: Array<{ content: Array<{ text: string }> }> }).output[0]?.content[0]?.text, "Hello");
 });
+
+test("handleResponses rejects missing input before contacting upstream", async () => {
+  let called = false;
+  const config: Config = {
+    port: 8080,
+    defaultProvider: "default",
+    providers: [{ name: "default", baseUrl: "https://upstream.example/v1", apiKey: "key", defaultModel: "model" }]
+  };
+  const res = new JsonResponse();
+
+  await handleResponses(
+    { body: { model: "model" } },
+    res,
+    config,
+    async () => {
+      called = true;
+      return Response.json({});
+    }
+  );
+
+  assert.equal(called, false);
+  assert.equal(res.statusCode, 400);
+  assert.match((res.body as { error: string }).error, /input/);
+});

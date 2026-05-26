@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { getConfigDir, loadConfig, normalizeConfig, saveConfig, toPublicConfig } from "./config.js";
-import { handleResponses, passthrough } from "./proxy.js";
+import { handleResponses, passthrough, setLogFn } from "./proxy.js";
 import type { Config } from "./types.js";
 
 const LOG_DIR = path.join(getConfigDir(), "logs");
@@ -25,6 +25,7 @@ function log(message: string): void {
 
 export async function createApp(config?: Config, options: { closeOnConfigSave?: () => void } = {}): Promise<express.Express> {
   config ??= await loadConfig();
+  setLogFn(log);
   const app = express();
   app.use(express.json({ limit: "10mb" }));
 
